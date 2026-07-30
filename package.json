@@ -1,8 +1,8 @@
 {
-  "name": "presentation-template-marp",
+  "name": "presentation-distributed-transactions-without-2pc",
   "version": "1.0.0",
   "private": true,
-  "description": "Reusable Marp template for technical talks and training.",
+  "description": "Why two-phase commit is often a poor fit for modern distributed systems, and how Saga, Transactional Outbox, and CQRS help services coordinate safely.",
   "engines": {
     "node": "24.18.0"
   },

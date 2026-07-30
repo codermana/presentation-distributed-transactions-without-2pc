@@ -4,8 +4,8 @@ theme: base
 paginate: true
 size: 16:9
 transition: fade 0.4s
-title: "Presentation Template"
-description: "Reusable Marp template for technical talks and training."
+title: "Distributed Transactions Without 2PC"
+description: "Why two-phase commit is often a poor fit for modern distributed systems, and how Saga, Transactional Outbox, and CQRS help services coordinate safely."
 author: "Gaurav Agarwal"
 footer: "![CoderMana](assets/codermana.svg)"
 ---
@@ -17,9 +17,9 @@ footer: "![CoderMana](assets/codermana.svg)"
 
 ###### Eyebrow
 
-# Presentation Template
+# Distributed Transactions Without 2PC
 
-Reusable Marp template for technical talks and training.
+Why two-phase commit is often a poor fit for modern distributed systems, and how Saga, Transactional Outbox, and CQRS help services coordinate safely.
 
 ###### Gaurav Agarwal
 
@@ -342,10 +342,10 @@ Work in pairs for 10 minutes.
 
 Code
 
-https://github.com/CoderMana/presentation-template-marp
+https://github.com/codermana/presentation-distributed-transactions-without-2pc
 
 Slides
 
-https://template-marp.slides.algogrit.com
+https://distributed-transactions-without-2pc.slides.algogrit.com
 
 <!-- deck:resources:end -->

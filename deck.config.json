@@ -1,14 +1,14 @@
 {
   "$schema": "./deck.config.schema.json",
-  "isTemplate": true,
+  "isTemplate": false,
   "eyebrow": "Eyebrow",
-  "title": "Presentation Template",
-  "description": "Reusable Marp template for technical talks and training.",
+  "title": "Distributed Transactions Without 2PC",
+  "description": "Why two-phase commit is often a poor fit for modern distributed systems, and how Saga, Transactional Outbox, and CQRS help services coordinate safely.",
   "author": "Gaurav Agarwal",
-  "slug": "template-marp",
+  "slug": "distributed-transactions-without-2pc",
   "repository": {
-    "organization": "CoderMana",
-    "name": "presentation-template-marp"
+    "organization": "codermana",
+    "name": "presentation-distributed-transactions-without-2pc"
   },
   "hosting": {
     "baseDomain": "slides.algogrit.com"
