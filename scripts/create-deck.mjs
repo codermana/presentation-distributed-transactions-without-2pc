@@ -177,6 +177,20 @@ function main() {
     homepage,
   ]);
 
+  // Enable GitHub Pages with Actions-based deployment so the CI workflow
+  // succeeds on the very first push without relying on enablement fallback.
+  try {
+    run('gh', [
+      'api',
+      '--method', 'POST',
+      `/repos/${repository}/pages`,
+      '-f', 'build_type=workflow',
+    ]);
+    console.log(`Pages enabled for ${repository}`);
+  } catch {
+    console.warn('Warning: could not enable Pages automatically. Enable it manually in Settings → Pages → Source → GitHub Actions.');
+  }
+
   writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`);
   run('npm', ['run', 'deck:sync']);
 
