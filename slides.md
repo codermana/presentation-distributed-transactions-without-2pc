@@ -199,7 +199,13 @@ Frame it fairly: 2PC is the obvious, principled answer to the previous section. 
 | All participants commit, or all roll back. The workflow gets the same guarantee a local transaction has. | A coordinator asks everyone to *prepare*, collects votes, then announces *commit* or *rollback*. | Formalized in the 1980s, standardized as XA. Databases, queues, and app servers have spoken it for decades. |
 
 <!--
-On paper this is exactly what part 1 asked for: extend BEGIN and COMMIT across machines. Mention XA so the term is on the table; older audience members will have used it via JTA or MSDTC.
+On paper this is exactly what part 1 asked for: extend BEGIN and COMMIT across machines.
+
+XA database is a database that supports the X/Open XA (eXtended Architecture) standard, which allows it to take part in distributed transactions across multiple different data stores or systems.
+
+Postgres Support link: https://www.postgresql.org/docs/current/two-phase.html
+
+Mention XA so the term is on the table; older audience members will have used it via JTA or MSDTC.
 -->
 
 ---
@@ -335,12 +341,51 @@ sequenceDiagram
 ```
 
 <!--
-This is the scenario that earned 2PC its reputation. The participants did everything right and are now stuck: committing unilaterally risks diverging from the verdict, rolling back risks the same. In practice an operator resolves in-doubt transactions by hand. Let that sink in before offering the Spanner nuance next.
+This is the scenario that earned 2PC its reputation. The participants did everything right and are now stuck: committing unilaterally risks diverging from the verdict, rolling back risks the same.
+
+Scenario A: Coordinator Crashes BEFORE Writing Decision to WAL -> It logs ABORTED to its WAL and sends a Rollback signal to all participants.
+
+Scenario B: Coordinator Crashes AFTER Writing COMMITTED to WAL -> Upon restarting, the coordinator reads its WAL and sees TX_1001: COMMITTED. It immediately resumes Phase 2 by re-sending Commit messages to all participants until everyone acknowledges.
+
+Scenario C: Participant-Initiated Recovery (Polling the Coordinator) -> Participant A asks Participant B: "Did you receive a decision for TX_1001?"
 -->
 
 ---
 
 ## Then why does Google Spanner use 2PC?
+
+---
+
+Google Spanner uses a two-phase commit (2PC) protocol, combined with Paxos groups and TrueTime, for distributed transactions that span multiple data splits or Paxos groups.
+
+---
+
+### 2PC vs. Paxos/Raft: Handling Node Failures
+
+<!-- The key limitation of 2PC is that it requires 100% agreement from 100% of nodes (All-or-Nothing). Consensus algorithms like Raft and Paxos relax this requirement by relying on Majority Quorums (`N/2 + 1`). -->
+
+---
+
+| Feature | Two-Phase Commit (2PC) | Paxos / Raft Consensus |
+| --- | --- | --- |
+| **Primary Goal** | **Atomic Commitment** across distinct, heterogeneous resource managers (e.g., DB A and DB B). | **State Machine Replication** / High Availability across redundant replicas of the *same* state. |
+| **Fault Tolerance Threshold** | **0 node crashes allowed** during active transaction without blocking. All nodes must respond. | **Can tolerate $\lfloor(N-1)/2\rfloor$ node failures** (e.g., 2 out of 5 nodes can crash, and the system continues normally). |
+| **Leader / Coordinator Crash** | **Blocks the system.** Participants remain in the "In-Doubt" state holding locks until the coordinator recovers. | **Automatic Leader Election.** If the leader crashes, followers elect a new leader automatically in milliseconds. |
+| **Participant / Node Crash** | The coordinator must wait or retry endlessly. If a node dies in Phase 1, the transaction aborts. | As long as a **quorum** (majority) acknowledges a log entry, the leader commits—it doesn't wait for the crashed node. |
+| **Blocking vs. Non-blocking** | **Blocking protocol.** Unreachable nodes cause active transactions to hold locks indefinitely. | **Non-blocking (asynchronous progress).** Slow or unresponsive minority nodes do not hold up operations. |
+
+---
+
+### Combining Both: Spanner & CockroachDB (2PC over Raft/Paxos)
+
+Modern distributed SQL databases don't choose between 2PC and Raft—they **combine both**:
+
+* **Raft/Paxos** is used *within* each shard/group to ensure high availability and automatic failover without blocking.
+* **2PC** is used *across* different shards to coordinate multi-shard distributed transactions.
+
+<!-- Because each participant in the 2PC protocol is itself a **highly available Raft group**, a single node crashing inside a participant group does not block 2PC—Raft simply elects a new leader for that shard, allowing 2PC to complete seamlessly. -->
+
+---
 
 * Each "participant" is a **Paxos group**, not a single machine
 * The coordinator's state is replicated too: a crash does not strand anyone
