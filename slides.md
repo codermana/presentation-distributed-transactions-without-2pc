@@ -26,7 +26,13 @@ Why two-phase commit is often a poor fit for modern distributed systems, and how
 <!-- deck:title:end -->
 
 <!--
-Welcome everyone, let the room fill up. Housekeeping: session is about 90 minutes, it is discussion-heavy, interrupt me any time in chat or on mic. Ask who has worked with microservices in production; calibrate depth from the answers.
+Welcome everyone
+
+> let the room fill up.
+
+Housekeeping: session is about 90 minutes, it is discussion-heavy, interrupt me any time in chat or on mic.
+
+> Ask who has worked with microservices in production; calibrate depth from the answers.
 -->
 
 ---
@@ -53,7 +59,9 @@ ex-Tarka Labs, ex-BrowserStack, ex-ThoughtWorks
 </div>
 
 <!--
-Thirty seconds max. One line on background, then move on. Mention the distributed design patterns training this material comes from; the repo link is at the end.
+> Talk about CoderMana and what we do. Show the site.
+
+Mention the distributed design patterns training this material comes from; the repo link is at the end.
 -->
 
 ---
@@ -70,7 +78,9 @@ Thirty seconds max. One line on background, then move on. Mention the distribute
 > One argument, four patterns. Each section builds on the previous one.
 
 <!--
-Set the frame: this is one argument told through four patterns, not a pattern catalog. Sections 3 to 5 each answer a problem the previous section exposes. Tell them the code is real and runnable, and we will run some of it live.
+> Set the frame: this is one argument told through four patterns, not a pattern catalog. 
+
+the code is real and runnable, and we will run some of it live.
 -->
 
 ---
@@ -82,7 +92,7 @@ Set the frame: this is one argument told through four patterns, not a pattern ca
 # Why distributed transactions are hard
 
 <!--
-Timing check: aim to be here within 5 minutes of the start.
+> Timing check: aim to be here within 5 minutes of the start.
 -->
 
 ---
@@ -94,7 +104,13 @@ Timing check: aim to be here within 5 minutes of the start.
 * Partial failure is invisible: the change either happened or it did not
 
 <!--
-Anchor the shared intuition first. Everyone in the room trusts a local transaction without thinking about it. Say explicitly: hold on to this feeling, because the rest of the talk is about what happens when you lose it.
+> Anchor the shared intuition first.
+
+Everyone in the room trusts a local transaction without thinking about it.
+
+> Say explicitly:
+
+hold on to this feeling, because the rest of the talk is about what happens when you lose it.
 -->
 
 ---
@@ -113,7 +129,13 @@ flowchart LR
 ```
 
 <!--
-Introduce the example we will reuse all session: placing an order touches inventory, payment, and notification, and every service owns its own database. No shared database, no shared transaction. Ask: what happens if payment succeeds but inventory reservation fails?
+> Introduce the example we will reuse all session:
+
+placing an order touches inventory, payment, and notification, and every service owns its own database. No shared database, no shared transaction.
+
+> Ask:
+
+what happens if payment succeeds but inventory reservation fails?
 -->
 
 ---
@@ -127,7 +149,11 @@ Introduce the example we will reuse all session: placing an order touches invent
 | Any call can fail after doing its work. The caller cannot tell "failed" from "succeeded but the reply got lost". | The standard cure for failure is retry. Retries mean the same request can arrive twice, so every effect can happen twice. | Nothing spans the services to keep them consistent while the workflow is in flight. Every service sees a different moment in time. |
 
 <!--
-Spend a moment on the middle card: retries are not an edge case, they are the default behavior of every HTTP client, queue, and service mesh. Duplicates are a feature of reliable systems, not a bug. This plants idempotency, which returns in part 5.
+> Spend a moment on the middle card:
+
+retries are not an edge case, they are the default behavior of every HTTP client, queue, and service mesh.
+
+Duplicates are a feature of reliable systems, not a bug.
 -->
 
 ---
@@ -145,7 +171,17 @@ sequenceDiagram
 ```
 
 <!--
-This is the single most important failure in the talk; the outbox section exists to fix it. Two systems, two writes, no transaction across them. Whichever order you do the writes in, a crash between them leaves the system lying to itself. Ask the room: does publishing first fix it? No, then you can announce an order that was never saved.
+> This is the single most important failure in the talk; the outbox section exists to fix it.
+
+Two systems, two writes, no transaction across them.
+
+> Ask the room:
+
+does publishing first fix it?
+
+> No, you can move to the next slide for the exercise, then you can announce an order that was never saved.
+
+Whichever order you do the writes in, a crash between them leaves the system lying to itself.
 -->
 
 ---
@@ -163,7 +199,7 @@ The checkout handler does, in this order:
 Where can this leave the system inconsistent?
 
 <!--
-Give the room two minutes, answers in chat. Expected finds: crash between 1 and 2 (order saved, never announced), crash between 2 and 3 (event out, payment never attempted), payment timeout at 3 (did it charge or not?), and a retry of the whole handler creating a second order. Every pattern in this talk maps to one of these answers; refer back to them by name later.
+> Give the room two minutes, answers in chat. Expected finds: crash between 1 and 2 (order saved, never announced), crash between 2 and 3 (event out, payment never attempted), payment timeout at 3 (did it charge or not?), and a retry of the whole handler creating a second order. Every pattern in this talk maps to one of these answers; refer back to them by name later.
 -->
 
 ---
@@ -173,7 +209,7 @@ Give the room two minutes, answers in chat. Expected finds: crash between 1 and 
 > Local transactions are not the hard part. **Telling everyone else what happened** is.
 
 <!--
-This is the one sentence of the talk. Pause on it. Everything that follows is a way to make either the local commit or the announcement reliable, and the trick is refusing to smear one transaction across the network.
+> This is the one sentence of the talk. Pause on it. Everything that follows is a way to make either the local commit or the announcement reliable, and the trick is refusing to smear one transaction across the network.
 -->
 
 ---
@@ -185,7 +221,7 @@ This is the one sentence of the talk. Pause on it. Everything that follows is a 
 # The promise and pain of 2PC
 
 <!--
-Frame it fairly: 2PC is the obvious, principled answer to the previous section. We take it seriously before we criticize it.
+> Frame it fairly: 2PC is the obvious, principled answer to the previous section. We take it seriously before we criticize it.
 -->
 
 ---
@@ -199,13 +235,13 @@ Frame it fairly: 2PC is the obvious, principled answer to the previous section. 
 | All participants commit, or all roll back. The workflow gets the same guarantee a local transaction has. | A coordinator asks everyone to *prepare*, collects votes, then announces *commit* or *rollback*. | Formalized in the 1980s, standardized as XA. Databases, queues, and app servers have spoken it for decades. |
 
 <!--
-On paper this is exactly what part 1 asked for: extend BEGIN and COMMIT across machines.
+On paper this is exactly what we have asked for: extend BEGIN and COMMIT across machines.
 
 XA database is a database that supports the X/Open XA (eXtended Architecture) standard, which allows it to take part in distributed transactions across multiple different data stores or systems.
 
-Postgres Support link: https://www.postgresql.org/docs/current/two-phase.html
+> Postgres Support link: https://www.postgresql.org/docs/current/two-phase.html
 
-Mention XA so the term is on the table; older audience members will have used it via JTA or MSDTC.
+> Mention XA so the term is on the table; older audience members will have used it via JTA or MSDTC.
 -->
 
 ---
@@ -226,7 +262,12 @@ sequenceDiagram
 ```
 
 <!--
-Walk it slowly, this diagram carries the section. Emphasize what "yes" costs: from the moment a participant votes yes, it holds locks and has surrendered the right to decide. It cannot commit, cannot roll back, until the coordinator speaks again.
+> Walk it slowly, this diagram carries the section.
+
+> Emphasize what "yes" costs:
+
+from the moment a participant votes yes, it holds locks and has surrendered the right to decide. It cannot commit, cannot roll back, until the coordinator speaks again.
+
 -->
 
 ---
@@ -248,7 +289,13 @@ type Participant interface {
 > Real participants are resource managers: databases, queues, anything that can vote.
 
 <!--
-Switch to the editor if the projection is small. The interface is the whole protocol contract: prepare is the vote, commit and rollback are the coordinator's verdict. DatabaseA and DatabaseB just print, which is exactly enough to see the protocol shape.
+> Switch to the editor if the projection is small.
+
+> The interface is the whole protocol contract:
+
+prepare is the vote, commit and rollback are the coordinator's verdict.
+
+DatabaseA and DatabaseB just print, which is exactly enough to see the protocol shape.
 -->
 
 ---
@@ -273,7 +320,13 @@ for _, participant := range c.participants {
 > A single "no", or a single timeout, dooms the whole transaction.
 
 <!--
-Point out the loop is sequential and blocking, and a production coordinator has the same structure with better plumbing. Ask: what does the coordinator do if a participant simply never answers? It waits. That question is the next slide.
+> Point out the loop is sequential and blocking, and a production coordinator has the same structure with better plumbing.
+
+> Ask:
+
+what does the coordinator do if a participant simply never answers?
+
+> It waits. That question is the next slide.
 -->
 
 ---
@@ -302,9 +355,9 @@ if allReady {
 ```
 
 <!--
-Live run: go run examples/03-data-management-single/03_2pc.go. Both databases prepare, both commit. Then change DatabaseB.Prepare to return false and run again to show the global rollback. The demo takes under a minute and makes the protocol concrete.
+> Live run: `go run examples/03-data-management-single/03_2pc.go`. Both databases prepare, both commit. Then change DatabaseB.Prepare to return false and run again to show the global rollback. The demo takes under a minute and makes the protocol concrete.
 
-Take a moment to explain the expanded example: `go run examples/03-data-management-single/03_2pc-expanded.go` as well.
+> Take a moment to explain the expanded example: `go run examples/03-data-management-single/03_2pc-expanded.go` as well.
 
 If a participant accepts the Prepare request during Phase 1 (voting YES) but then never commits—whether due to a prolonged crash, network partition, or unrecoverable disk failure—it creates one of the most critical challenges in distributed systems: the **In-Doubt State**.
 -->
@@ -320,7 +373,11 @@ If a participant accepts the Prepare request during Phase 1 (voting YES) but the
 | Prepared participants hold locks while they wait. Throughput is hostage to the slowest participant. | The workflow is only as available as the coordinator *and* every participant, multiplied together. | XA assumes participants that speak the protocol. Your REST and gRPC services do not, and bolting it on couples their deployments. |
 
 <!--
-The third card is the one microservice audiences need most: 2PC is not wrong, it is a protocol for resource managers inside one trust domain, and independent services are neither. Availability math example: five participants at 99.9 percent each compound to roughly 99.4 percent for every workflow.
+> The third card is the one microservice audiences need most:
+
+2PC is not wrong, it is a protocol for resource managers inside one trust domain, and independent services are neither.
+
+> Availability math example: five participants at 99.9 percent each compound to roughly 99.4 percent for every workflow.
 -->
 
 ---
@@ -394,7 +451,11 @@ Modern distributed SQL databases don't choose between 2PC and Raft—they **comb
 > The pain is not the protocol. It is **fragile coordinators and participants**.
 
 <!--
-This nuance keeps the talk honest. Spanner runs 2PC over consensus groups, so the classic failure mode (a single dead box stranding everyone) does not exist. The lesson: 2PC over reliable, replicated participants inside one system is fine. 2PC across independently owned services is where the assumptions collapse.
+> This nuance keeps the talk honest.
+
+Spanner runs 2PC over consensus groups, so the classic failure mode (a single dead box stranding everyone) does not exist.
+
+The lesson: 2PC over reliable, replicated participants inside one system is fine. 2PC across independently owned services is where the assumptions collapse.
 -->
 
 ---
@@ -408,7 +469,11 @@ Between microservices you own separately: avoid 2PC. The rest of this talk is wh
 > Caveat: inside one trust domain, with real XA support and short-lived transactions, 2PC remains a legitimate tool. Your database uses it internally more than you think.
 
 <!--
-Anticipated question: "so is 2PC dead?" Answer: no, it moved down the stack. It lives inside databases, inside Spanner-like systems, between a broker and a database in the same operational domain. What died is stretching it across independently deployed services. Park deeper debate for the discussion section.
+> Anticipated question: "so is 2PC dead?"
+
+Answer: no, it moved down the stack. It lives inside databases, inside Spanner-like systems, between a broker and a database in the same operational domain. What died is stretching it across independently deployed services.
+
+> Park deeper debate for the discussion section.
 -->
 
 ---
@@ -420,7 +485,9 @@ Anticipated question: "so is 2PC dead?" Answer: no, it moved down the stack. It 
 # Saga: coordination through compensation
 
 <!--
-Timing check: roughly a third of the way through the clock. Bridge: if we refuse one global transaction, we must break the workflow into pieces that each commit locally. That is a saga.
+> Timing check: roughly a third of the way through the clock.
+
+if we refuse one global transaction, we must break the workflow into pieces that each commit locally. That is a saga.
 -->
 
 ---
@@ -432,7 +499,16 @@ Timing check: roughly a third of the way through the clock. Bridge: if we refuse
 * If step N fails: run compensations N-1 down to 1, in reverse
 
 <!--
-Credit the 1987 Garcia-Molina and Salem paper; the idea predates microservices by decades. Stress "semantically undoes": there is no rollback of a committed transaction, only a new transaction that reverses the business effect. A refund is not an un-charge.
+
+> Stress "semantically undoes"
+
+there is no rollback of a committed transaction, only a new transaction that reverses the business effect.
+
+A refund is not an un-charge.
+
+> Credit the 1987 Garcia-Molina and Salem paper
+
+the idea predates microservices by decades.
 -->
 
 ---
@@ -454,7 +530,11 @@ sequenceDiagram
 ```
 
 <!--
-Walk forward first, then the reverse wave of compensations. Point out every box on the diagonal is a committed local transaction; the world saw those states. A customer refreshing at the wrong moment sees a paid order that later becomes cancelled. That visibility is the price of no isolation, and it comes back two slides from now.
+> Walk forward first, then the reverse wave of compensations.
+
+> Point out the loops on the diagram which are a committed local transaction; the world saw those states.
+
+A customer refreshing at the wrong moment sees a paid order that later becomes cancelled. That visibility is the price of no isolation.
 -->
 
 ---
@@ -484,7 +564,7 @@ func Shipping() error {
 ```
 
 <!--
-Each function stands in for a whole service call that commits its own transaction. The commented line in Payment is the demo switch; leave it alone for now, we flip it in two slides.
+> Open: examples/03-data-management-single/04_saga.go
 -->
 
 ---
@@ -514,7 +594,11 @@ func CancelShipping() error {
 ```
 
 <!--
-The index pairing is the contract: compensations[i] undoes steps[i]. Ask the room what CancelPayment really is in production: a refund, which can itself fail, be duplicated, or arrive after the customer called their bank. Compensations are business operations with all the same failure modes.
+The index pairing is the contract: compensations[i] undoes steps[i].
+
+> Ask the room what CancelPayment really is in production: a refund, which can itself fail, be duplicated, or arrive after the customer called their bank.
+
+Compensations are business operations with all the same failure modes.
 -->
 
 ---
@@ -543,7 +627,15 @@ func RunSaga(steps []Step, compensations []Step) error {
 ```
 
 <!--
-Live demo, the centerpiece of this section. First: go run examples/03-data-management-single/04_saga.go, clean run. Then uncomment the card declined line in Payment and run again: booking happens, payment fails, and only CancelOrderBooking runs, in reverse order. Point at j := i - 1: the failed step compensates nothing, only completed steps are undone. Re-comment the line afterward.
+> Live demo, the centerpiece of this section.
+
+> First: go run examples/03-data-management-single/04_saga.go, clean run.
+
+> Then uncomment the card declined line in Payment and run again: booking happens, payment fails, and only CancelOrderBooking runs, in reverse order.
+
+> Point at j := i - 1: the failed step compensates nothing, only completed steps are undone.
+
+> Re-comment the line afterward.
 -->
 
 ---
@@ -557,7 +649,11 @@ Live demo, the centerpiece of this section. First: go run examples/03-data-manag
 | One orchestrator calls each step and decides what happens on failure. The workflow is explicit in one place, easy to read and test, but the orchestrator is a coupling point. | Each service reacts to the previous service's events. No central brain, loose coupling, but the workflow exists only as an emergent property. Nobody can point at it. |
 
 <!--
-Our RunSaga is a tiny orchestrator. Rule of thumb: choreography reads well at 2 or 3 steps, and turns into archaeology beyond that; orchestration scales with workflow complexity. Discussion prompt: which one do their teams run today, and did they choose it on purpose?
+Our RunSaga is a tiny orchestrator.
+
+Rule of thumb: choreography reads well at 2 or 3 steps, and turns into archaeology beyond that; orchestration scales with workflow complexity.
+
+> Discussion prompt: which one do their teams run today, and did they choose it on purpose?
 -->
 
 ---
@@ -571,7 +667,9 @@ Our RunSaga is a tiny orchestrator. Rule of thumb: choreography reads well at 2 
 | The refund can bounce. Then you retry it, park it in a dead-letter queue, or page a human. There is no deeper fallback. | Steps time out, callers retry, and one slow service turns into a thundering herd of half-run sagas. | Other transactions see intermediate states. The paid-then-cancelled order is visible to anyone who looks. |
 
 <!--
-Anticipated question: "what if the compensation fails?" Be honest: you retry with backoff, then escalate to humans; that is what the countermeasures literature amounts to. The no-isolation card sets up part 5, where read models give us a place to be honest with users about in-flight state.
+> Anticipated question: "what if the compensation fails?"
+
+> Be honest: you retry with backoff, then escalate to humans; that is what the countermeasures literature amounts to.
 -->
 
 ---
@@ -581,7 +679,13 @@ Anticipated question: "what if the compensation fails?" Be honest: you retry wit
 > Each saga step commits locally, then **announces itself** with an event. So everything rests on one question: can you make that announcement **reliable**?
 
 <!--
-The bridge slide. A saga is only as sound as the events that drive it from step to step, and slide 8 already showed the announcement is exactly what a crash eats. Which is why the next pattern exists.
+> The bridge slide.
+
+A saga is only as sound as the events that drive it from step to step.
+
+And previous slide already showed the announcement is exactly what a crash eats.
+
+Which is why the next pattern exists.
 -->
 
 ---
@@ -593,7 +697,11 @@ The bridge slide. A saga is only as sound as the events that drive it from step 
 # Transactional Outbox
 
 <!--
-Timing check: about halfway. This section is the most immediately applicable pattern in the talk; most teams can adopt it this quarter without an architecture rewrite.
+> Timing check: about halfway.
+
+This section is the most immediately applicable pattern in the talk; 
+
+most teams can adopt it this quarter without an architecture rewrite.
 -->
 
 ---
