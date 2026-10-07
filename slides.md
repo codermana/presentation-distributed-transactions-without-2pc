@@ -711,7 +711,11 @@ most teams can adopt it this quarter without an architecture rewrite.
 > The dual write, one more time: commit the row, crash before the publish, and the saga's nervous system goes silent.
 
 <!--
-Deliberately repeat slide 8, the exercise answer number one. Repetition is the point: the audience should recognize the dual-write problem on sight by now. The fix is almost embarrassingly simple.
+> Deliberately repeat slide 8, the exercise answer number one.
+
+> Repetition is the point: the audience should recognize the dual-write problem on sight by now.
+
+The fix is almost embarrassingly simple.
 -->
 
 ---
@@ -730,7 +734,13 @@ flowchart LR
 ```
 
 <!--
-The whole trick in one sentence: do not write to two systems, write the event into the same database as the data, in the same transaction. The outbox row and the order row commit or roll back together. A separate relay moves outbox rows to the broker afterward, and it can crash and retry freely because the truth is safely in the database.
+> The whole trick in one sentence:
+
+do not write to two systems, write the event into the same database as the data, in the same transaction.
+
+The outbox row and the order row commit or roll back together.
+
+A separate relay moves outbox rows to the broker afterward, and it can crash and retry freely because the truth is safely in the database.
 -->
 
 ---
@@ -760,7 +770,13 @@ type OutboxEvent struct {
 > The outbox is just a table. No new infrastructure on the write path.
 
 <!--
-Emphasize how boring this is: the event is a row. Published is the relay's bookmark. In production you would add a payload column with the serialized event and a created_at for ordering, but the shape is this shape.
+> Emphasize how boring this is:
+
+the event is a row.
+
+Published is the relay's bookmark.
+
+In production you would add a payload column with the serialized event and a created_at for ordering, but the shape is this shape.
 -->
 
 ---
@@ -792,7 +808,11 @@ func createOrderWithEvent(db *gorm.DB, order Order) {
 ```
 
 <!--
-Open this in the editor rather than running it (it needs sqlite and gorm; the run is in the lecture notes if asked). Point at tx.Begin and tx.Commit bracketing both inserts: that bracket is the entire pattern. Crash anywhere inside and neither row exists; crash after and both do.
+> Open this in the editor rather than running it (it needs sqlite and gorm; the run is in the lecture notes if asked).
+
+> Point at tx.Begin and tx.Commit bracketing both inserts:
+
+this is the entire pattern. Crash anywhere inside and neither row exists; crash after and both do.
 -->
 
 ---
@@ -821,7 +841,15 @@ func relayOutboxEvents(db *gorm.DB, publish func(OutboxEvent)) {
 ```
 
 <!--
-Trace the crash window out loud: publish succeeds, the process dies before Update, and on restart the event publishes again. That is not a bug to fix, it is the deal you signed: at-least-once delivery. You cannot get exactly-once out of this loop, you get duplicates plus idempotent consumers. Let that land, the next two slides build on it.
+> Trace the crash window out loud:
+
+publish succeeds, the process dies before Update, and on restart the event publishes again.
+
+That is not a bug to fix, it is the deal you signed: at-least-once delivery.
+
+You cannot get exactly-once out of this loop, you get duplicates plus idempotent consumers.
+
+> Let that land, the next two slides build on it.
 -->
 
 ---
@@ -837,7 +865,15 @@ flowchart LR
 ```
 
 <!--
-Two implementations of the same idea. Polling is what we just read: simple, no new infrastructure, adds latency and query load. CDC tails the database's own replication log, Debezium into Kafka being the canonical stack: near-real-time, no polling load, but a new operational component to run. Start with polling; move to CDC when lag or load says so.
+> Two implementations of the same idea.
+
+Polling is what we just read: simple, no new infrastructure, adds latency and query load.
+
+> Change Data Capture (CDC) is a data integration process that identifies and tracks changes to data in a source database and delivers them in real time to downstream systems.
+
+CDC tails the database's own replication log, Debezium into Kafka being the canonical stack: near-real-time, no polling load, but a new operational component to run.
+
+Start with polling; move to CDC when lag or load says so.
 -->
 
 ---
@@ -851,7 +887,11 @@ Two implementations of the same idea. Polling is what we just read: simple, no n
 | Delivery is guaranteed, uniqueness is not. Every consumer will eventually see a duplicate. | Rows publish in relay order, but consumers can still observe cross-service interleavings you did not plan. | Every consumer must be idempotent: dedupe by event id, or make the handler naturally safe to repeat. |
 
 <!--
-Practical idempotency recipes to say out loud: store processed event ids in the consumer's own database inside its local transaction, or design handlers so replaying is harmless (set status to paid is safe to repeat, increment balance is not). Anticipated question about exactly-once tooling: broker features like Kafka transactions narrow the window but the consumer contract stays at-least-once in practice.
+> Practical idempotency recipes to say out loud:
+
+store processed event ids in the consumer's own database inside its local transaction, or design handlers so replaying is harmless (set status to paid is safe to repeat, increment balance is not).
+
+> Anticipated question about exactly-once tooling: broker features like Kafka transactions narrow the window but the consumer contract stays at-least-once in practice.
 -->
 
 ---
@@ -863,7 +903,7 @@ Practical idempotency recipes to say out loud: store processed event ids in the 
 # Putting the patterns together
 
 <!--
-Timing check: rough target, two thirds of the clock. This is where the running example pays off end to end. Never cut this section short; cut discussion instead.
+> Timing check: rough target, two thirds of the clock. This is where the running example pays off end to end. Never cut this section short; cut discussion instead.
 -->
 
 ---
@@ -883,7 +923,15 @@ flowchart LR
 ```
 
 <!--
-Motivate it from pain the audience knows: "where is my order?" needs data from three services, and calling all three per page load is misery. CQRS here is not a detour: the outbox events we just made reliable are exactly what feeds the projector. We separate reads from writes because the write side is already asynchronous.
+> CQRS (Command Query Responsibility Segregation) is a software architecture pattern that uses distinct models for updating data and reading data.
+
+> Motivate it from pain the audience knows:
+
+"where is my order?" needs data from three services, and calling all three per page load is misery.
+
+CQRS here is not a detour: the outbox events we just made reliable are exactly what feeds the projector.
+
+We separate reads from writes because the write side is already asynchronous.
 -->
 
 ---
@@ -892,12 +940,22 @@ Motivate it from pain the audience knows: "where is my order?" needs data from t
 
 ## CQRS is not event sourcing
 
-CQRS separates the read path from the write path. That is the whole claim.
-
-> Caveat: event sourcing (storing state *as* the event log) is a different, stronger commitment. You can do CQRS with a perfectly ordinary relational write model, and most teams should start there. The training repo has an event sourcing example if you are curious.
+CQRS separates the read path from the write path.
 
 <!--
-Preempt the most common conflation in this space. CQRS plus outbox events plus a boring Postgres write model is a mainstream, low-regret setup. Event sourcing changes your storage model and your migration story; do not let the audience leave thinking they must buy both.
+
+> Caveat:
+
+event sourcing (storing state *as* the event log) is a different, stronger commitment. You can do CQRS with a perfectly ordinary relational write model, and most teams should start there.
+
+> The training repo has an event sourcing example if you are curious.
+
+> Preempt the most common conflation in this space.
+
+CQRS plus outbox events plus a boring Postgres write model is a mainstream, low-regret setup.
+
+Event sourcing changes your storage model and your migration story;
+> do not let the audience leave thinking they must buy both.
 -->
 
 ---
@@ -926,7 +984,11 @@ func createOrder(db *gorm.DB, order Order) {
 ```
 
 <!--
-Editor walkthrough, not a live run (needs redis). The write side is deliberately unremarkable: a normal insert into a normal table. In the full picture this insert would go through createOrderWithEvent from the outbox example, which is exactly the point of putting the patterns together.
+> Editor walkthrough, not a live run (needs redis).
+
+The write side is deliberately unremarkable: a normal insert into a normal table.
+
+In the full picture this insert would go through createOrderWithEvent from the outbox example, which is exactly the point of putting the patterns together.
 -->
 
 ---
@@ -954,7 +1016,13 @@ func getOrderFromCache(client *redis.Client, orderID string) (string, error) {
 > The read path never touches the write model. That is the whole contract.
 
 <!--
-Editor walkthrough. Redis-as-read-model is a toy standing in for the real thing: in production this is a denormalized order-status table or a search index. The essential property survives the toy: queries are served from a model built for reading, not from the transactional tables.
+> Editor walkthrough. Redis-as-read-model is a toy standing in for the real thing:
+
+in production this is a denormalized order-status table or a search index.
+
+> The essential property survives the toy:
+
+queries are served from a model built for reading, not from the transactional tables.
 -->
 
 ---
@@ -976,10 +1044,18 @@ func cacheOrder(client *redis.Client, orderID string, orderDetails string) {
 }
 ```
 
+<!--
 > In production, this write is a projector consuming the events the outbox made reliable.
 
-<!--
-This function is the projector in miniature. The full loop: OrderPlaced, PaymentCompleted, and OrderShipped events arrive from the broker, and each handler folds them into the read model, here a cache set. Connect it back: these are exactly the events the outbox relay published, which is why CQRS belongs in this talk at all.
+This function is the projector in miniature.
+
+The full loop: OrderPlaced, PaymentCompleted, and OrderShipped events arrive from the broker, and each handler folds them into the read model,
+
+> here a cache set.
+
+> Connect it back:
+
+these are exactly the events the outbox relay published, which is why CQRS belongs in this talk at all.
 -->
 
 ---
@@ -1008,7 +1084,18 @@ flowchart LR
 ```
 
 <!--
-The centerpiece; budget five minutes and walk it twice. First pass, the mechanics: every service commits state plus outbox row locally, relays publish, the next saga step reacts, and the projector folds every event into the read model. Second pass, the guarantees: no 2PC anywhere, every arrow is at-least-once, every box is a local transaction, and the saga from part 3 is the sequence OrderPlaced, PaymentCompleted, OrderShipped. The customer reads a projection that might lag by a moment, and that lag is the price of everything else.
+
+> The centerpiece; budget five minutes and walk it twice.
+
+> First pass, the mechanics:
+
+every service commits state plus outbox row locally, relays publish, the next saga step reacts, and the projector folds every event into the read model.
+
+> Second pass, the guarantees:
+
+no 2PC anywhere, every arrow is at-least-once, every box is a local transaction, and the saga is the sequence OrderPlaced, PaymentCompleted, OrderShipped.
+
+The customer reads a projection that might lag by a moment, and that lag is the price of everything else.
 -->
 
 ---
@@ -1025,7 +1112,13 @@ The card is declined:
 > At every step, the system is honest about what it knows so far.
 
 <!--
-Walk it concretely with the diagram still in mind from the previous slide. Point out there is no rollback anywhere: only forward-moving local transactions, some of which are compensations. The pending-then-cancelled sequence the customer sees is the no-isolation caveat from part 3 made visible, and the read model is where you present it gracefully.
+> Walk it concretely with the diagram still in mind from the previous slide.
+
+> Point out there is no rollback anywhere:
+
+only forward-moving local transactions, some of which are compensations.
+
+The pending-then-cancelled sequence the customer sees is the no-isolation caveat made visible, and the read model is where you present it gracefully.
 -->
 
 ---
@@ -1039,7 +1132,11 @@ Walk it concretely with the diagram still in mind from the previous slide. Point
 | Every cross-service call gets retries with backoff and a timeout. Assume every message arrives at least twice. | Consumers record processed event ids in their own database, inside their own local transaction. | Prefer naturally idempotent handlers: set status, upsert by key. Reserve id-tracking for effects that cannot be repeated, like charging a card. |
 
 <!--
-This is the operational summary of everything since part 1: retries cause duplicates, duplicates demand idempotency, idempotency is enforced with the same local-transaction trick the outbox uses (the dedupe record commits with the state change). One mechanism, used everywhere.
+> This is the operational summary of everything since part 1:
+
+retries cause duplicates, duplicates demand idempotency, idempotency is enforced with the same local-transaction trick the outbox uses (the dedupe record commits with the state change).
+
+One mechanism, used everywhere.
 -->
 
 ---
@@ -1053,7 +1150,13 @@ This is the operational summary of everything since part 1: retries cause duplic
 | Global atomicity and isolation. Intermediate states are visible; reads can lag writes. | Availability, loose coupling, independent deployment and scaling per service. | Compensation logic, idempotent consumers, and monitoring for stuck sagas and outbox lag. |
 
 <!--
-Say the quiet part: this is more moving parts than a monolith with one database. If a modular monolith still fits the product, that single BEGIN COMMIT is the best deal in software; these patterns are for when you have already paid for service boundaries. That honesty sets up the discussion section.
+> Say the quiet part:
+
+this is more moving parts than a monolith with one database.
+
+If a modular monolith still fits the product, that single BEGIN COMMIT is the best deal in software; these patterns are for when you have already paid for service boundaries.
+
+> That honesty sets up the discussion section.
 -->
 
 ---
@@ -1067,7 +1170,13 @@ Say the quiet part: this is more moving parts than a monolith with one database.
 > You will more often adopt these patterns through a tool than hand-roll them.
 
 <!--
-Ask who runs any of these already; answers make good discussion seeds. Position durable execution honestly: Temporal is orchestration from part 3 productized, with the bookkeeping (retries, timers, resumable history) that our 15-line RunSaga waved away. Teams on plain queues plus cron-driven pollers are also running these patterns, just anonymously.
+> Ask who runs any of these already; answers make good discussion seeds.
+
+> Position durable execution honestly:
+
+Temporal is orchestration from saga productized, with the bookkeeping (retries, timers, resumable history) that our 15-line RunSaga waved away.
+
+Teams on plain queues plus cron-driven pollers are also running these patterns, just anonymously.
 -->
 
 ---
@@ -1079,7 +1188,9 @@ Ask who runs any of these already; answers make good discussion seeds. Position 
 # Discussion
 
 <!--
-Timing check: whatever the clock says, protect at least ten minutes here; this session's format promises discussion. If running long, this is the buffer.
+> Timing check: whatever the clock says, protect at least ten minutes here; this session's format promises discussion.
+
+> If running long, this is the buffer.
 -->
 
 ---
@@ -1091,7 +1202,13 @@ Timing check: whatever the clock says, protect at least ten minutes here; this s
 3. What does "good enough consistency" mean for your product?
 
 <!--
-Seed answers if the room is quiet. For 1: inside one trust domain with real XA, or a Spanner-class system. For 2: one database, low traffic, a modular monolith, or a team that cannot yet staff the operational load. For 3: push them toward product language, like how stale may an order status page be, and who is harmed by a duplicate email versus a duplicate charge.
+> Seed answers if the room is quiet.
+
+For 1: inside one trust domain with real XA, or a Spanner-class system.
+
+For 2: one database, low traffic, a modular monolith, or a team that cannot yet staff the operational load.
+
+For 3: push them toward product language, like how stale may an order status page be, and who is harmed by a duplicate email versus a duplicate charge.
 -->
 
 ---
@@ -1106,7 +1223,11 @@ Seed answers if the room is quiet. For 1: inside one trust domain with real XA, 
 | Fast reads across services | CQRS read models | Eventual consistency, projector lag |
 
 <!--
-The promised decision framework, one row per pattern. Read it left to right as need, tool, price. Emphasize the rows compose: the end-to-end picture was row two plus row three plus row four, and the price column is why you adopt them one at a time as needs appear, not as a bundle.
+> The promised decision framework, one row per pattern.
+
+> Read it left to right as need, tool, price.
+
+> Emphasize the rows compose: the end-to-end picture was row two plus row three plus row four, and the price column is why you adopt them one at a time as needs appear, not as a bundle.
 -->
 
 ---
@@ -1121,7 +1242,9 @@ The promised decision framework, one row per pattern. Read it left to right as n
 * You do not need a global commit. You need **reliable local transactions** plus a **reliable way to tell everyone what happened**
 
 <!--
-Bullets reveal one at a time; land the last one as the sentence to leave the room with, mirroring the quote from part 1. Thank the room, then the resources slide stays up during Q&A.
+> Bullets reveal one at a time; land the last one as the sentence to leave the room with, mirroring the quote from part 1.
+
+> Thank the room, then the resources slide stays up during Q&A.
 -->
 
 ---
