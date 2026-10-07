@@ -297,6 +297,10 @@ if allReady {
 
 <!--
 Live run: go run examples/03-data-management-single/03_2pc.go. Both databases prepare, both commit. Then change DatabaseB.Prepare to return false and run again to show the global rollback. The demo takes under a minute and makes the protocol concrete.
+
+Take a moment to explain the expanded example: `go run examples/03-data-management-single/03_2pc-expanded.go` as well.
+
+If a participant accepts the Prepare request during Phase 1 (voting YES) but then never commits—whether due to a prolonged crash, network partition, or unrecoverable disk failure—it creates one of the most critical challenges in distributed systems: the **In-Doubt State**.
 -->
 
 ---
